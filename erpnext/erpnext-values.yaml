@@ -1,0 +1,139 @@
+# Default values for erpnext.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Configure external database host
+# dbHost: ""
+# dbPort: 3306
+# dbRootUser: ""
+# dbRootPassword: ""
+# dbRds: false
+# dbExistingSecret: ""
+# dbExistingSecretPasswordKey: "password"
+
+image:
+  repository: frappe/erpnext
+  tag: v15.54.4
+  pullPolicy: IfNotPresent
+
+nginx:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPU: 75
+    targetMemory: 75
+  environment:
+    upstreamRealIPAddress: "127.0.0.1"
+    upstreamRealIPRecursive: "off"
+    upstreamRealIPHeader: "X-Forwarded-For"
+    frappeSiteNameHeader: "$host"
+    proxyReadTimeout: "120"
+    clientMaxBodySize: "50m"
+  livenessProbe:
+    tcpSocket:
+      port: 8080
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  readinessProbe:
+    tcpSocket:
+      port: 8080
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  service:
+    type: ClusterIP
+    port: 8080
+  resources: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+worker:
+  gunicorn:
+    replicaCount: 1
+    autoscaling:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 3
+      targetCPU: 75
+      targetMemory: 75
+    livenessProbe:
+      tcpSocket:
+        port: 8000
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    readinessProbe:
+      tcpSocket:
+        port: 8000
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    service:
+      type: ClusterIP
+      port: 8000
+    resources: {}
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
+
+  persistence:
+    enabled: true
+    size: 8Gi
+    storageClass: gp3  # Ensure worker PVC uses the gp3 storage class
+    accessModes:
+      - ReadWriteOnce
+
+# Ingress configuration
+ingress:
+  enabled: true
+  ingressClassName: nginx-ingress-ingress-nginx-controller  # Match the name of your Ingress controller
+  annotations: {}
+  hosts:
+    - host: "erp.mydomain.com"  # Or the LoadBalancer DNS name for now
+      paths:
+        - path: "/"  # Ensure the path is set correctly
+          pathType: Prefix  # Use Prefix for general routing
+  tls: []  # SSL/TLS can be configured later if needed
+
+
+persistence:
+  worker:
+    enabled: true
+    size: 8Gi
+    storageClass: gp3  # Use gp3 storage class for worker persistence
+    accessModes:
+      - ReadWriteOnce
+  logs:
+    enabled: false
+    size: 8Gi
+    storageClass: gp3
+    accessModes:
+      - ReadWriteMany
+
+# Other persistence and settings
+redis-cache:
+  enabled: true
+  architecture: standalone
+  master:
+    containerPorts:
+      redis: 6379
+    persistence:
+      enabled: false
+
+mariadb:
+  enabled: true
+  auth:
+    rootPassword: "changeit"
+    username: "erpnext"
+    password: "changeit"
+    replicationPassword: "changeit"
+  primary:
+    service:
+      ports:
+        mysql: 3306
+    extraFlags: >-
+      --skip-character-set-client-handshake
+      --skip-innodb-read-only-compressed
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+
